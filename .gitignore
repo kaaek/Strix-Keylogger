@@ -1,3 +1,4 @@
 *.txt
+*.aes
 *.pdf
 /__pycache__
