@@ -2,10 +2,7 @@
 
 Named after Strix from the Roman occult and folklore, a nocturnal owl that observes and feeds in the dark. Strix is a remote keylogger tool. Running it saves keystrokes to a stream. At regular intervals, the stream is saved to an AES-256 encrypted file "log.txt.aes" and e-mailed to the e-mail address provided.
 
-**Setup:** Run the following commands to download two required dependencies:
-```
-python -m pip install pynput
-python -m pip install pyAesCrypt
+**Setup:** Run the following command to download the dependencies (they are pyAesCrypt and pynput): `pip install requirements.txt`
 ```
 
 **Usage:** `python strix.py "<E-mail address>" "<App password>" [Time interval] [32-bit Encryption key]`
